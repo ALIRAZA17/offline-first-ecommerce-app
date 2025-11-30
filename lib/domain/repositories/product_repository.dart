@@ -1,5 +1,10 @@
-import '../entities/product.dart';
+
+import 'package:offline_ecommerce/domain/entities/product_entity.dart';
 
 abstract class ProductRepository {
-  Future<List<Product>> getProducts();
+  Future<List<ProductEntity>> getProducts();
+  Future<ProductEntity?> getProduct(int id);
+  Future<void> addProduct(ProductEntity product);
+  Future<void> updateProduct(ProductEntity product);
+  Future<void> deleteProduct(int id);
 }
