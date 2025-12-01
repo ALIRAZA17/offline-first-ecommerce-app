@@ -6,7 +6,7 @@ import 'package:path/path.dart' as p;
 
 part 'app_database.g.dart';
 
-/// Table: Products
+/// Table: Products (existing)
 class Products extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get name => text()();
@@ -16,13 +16,46 @@ class Products extends Table {
   TextColumn get imageUrl => text().nullable()();
 }
 
-/// Drift database
-@DriftDatabase(tables: [Products])
+/// NEW: Sync queue table for offline-first queued operations
+/// We store the operation type, the target table (e.g. "products"),
+/// a JSON payload (string) and a createdAt timestamp.
+class SyncQueue extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get operation => text()(); // "add" | "update" | "delete"
+  TextColumn get tablename => text()(); // "products", etc.
+  TextColumn get payload => text()(); // JSON encoded payload
+  DateTimeColumn get createdAt =>
+      dateTime().clientDefault(() => DateTime.now())();
+}
+
+@DriftDatabase(tables: [Products, SyncQueue])
 class AppDatabase extends _$AppDatabase {
+  // If the DB file already exists on devices, we'll migrate to the new schema.
   AppDatabase() : super(_openConnection());
 
+  // Bump schema version because we added a table
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  // Migration strategy: create missing table(s) on upgrade
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+        // onCreate is called when DB is first created
+        onCreate: (m) async {
+          await m.createAll();
+        },
+
+        // onUpgrade runs when schemaVersion increases
+        onUpgrade: (m, from, to) async {
+          if (from < 2) {
+            // Create the new table(s) added in schema version 2.
+            // This will create the SyncQueue table without touching existing data.
+            await m.createTable(syncQueue);
+          }
+        },
+
+        // You can also provide onDowngrade if needed in the future.
+      );
 }
 
 /// LazyDatabase ensures DB is opened only when needed

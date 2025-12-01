@@ -65,4 +65,28 @@ class ProductModel {
       imageUrl: entity.imageUrl,
     );
   }
+
+  // Convert Supabase row -> Model
+  factory ProductModel.fromMap(Map<String, dynamic> map) {
+    return ProductModel(
+      id: map['id'] as int?,
+      name: map['name'] as String,
+      price: (map['price'] as num).toDouble(),
+      stock: map['stock'] as int,
+      description: map['description'] as String?,
+      imageUrl: map['imageUrl'] as String?,
+    );
+  }
+
+  // Convert Model -> Map (for Supabase insert/update)
+  Map<String, dynamic> toMap() {
+    return {
+      if (id != null) 'id': id,
+      'name': name,
+      'price': price,
+      'stock': stock,
+      'description': description,
+      'imageUrl': imageUrl,
+    };
+  }
 }

@@ -7,4 +7,7 @@ abstract class ProductRepository {
   Future<void> addProduct(ProductEntity product);
   Future<void> updateProduct(ProductEntity product);
   Future<void> deleteProduct(int id);
+  Future<void> addProductFromMap(Map<String, dynamic> productMap);
+  Future<void> updateProductFromMap(Map<String, dynamic> productMap);
+  
 }

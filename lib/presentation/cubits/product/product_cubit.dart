@@ -17,6 +17,7 @@ class ProductCubit extends Cubit<ProductState> {
   final AddProductUseCase addProductUseCase;
   final UpdateProductUseCase updateProductUseCase;
   final DeleteProductUseCase deleteProductUseCase;
+  
 
   /// Positional parameters are easier for Injectable
   ProductCubit(
@@ -72,26 +73,5 @@ class ProductCubit extends Cubit<ProductState> {
     } catch (e) {
       emit(ProductError(e.toString()));
     }
-  }
-
-  Future<void> seedDummyProducts() async {
-    final dummy = [
-      ProductEntity(name: "Wireless Earbuds", price: 29.99, stock: 120),
-      ProductEntity(name: "Smart LED Bulb", price: 9.99, stock: 300),
-      ProductEntity(name: "Bluetooth Speaker", price: 49.99, stock: 80),
-      ProductEntity(name: "USB-C Cable", price: 5.49, stock: 500),
-      ProductEntity(name: "Gaming Mouse", price: 25.00, stock: 50),
-      ProductEntity(name: "Laptop Stand", price: 19.99, stock: 60),
-      ProductEntity(name: "Water Bottle", price: 12.99, stock: 200),
-      ProductEntity(name: "Notebook", price: 3.99, stock: 100),
-      ProductEntity(name: "Phone Holder", price: 7.99, stock: 150),
-      ProductEntity(name: "Desk Lamp", price: 15.99, stock: 70),
-    ];
-
-    for (final p in dummy) {
-      await addProduct(p);
-    }
-
-    await loadProducts();
   }
 }
