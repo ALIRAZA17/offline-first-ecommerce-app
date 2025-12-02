@@ -8,12 +8,18 @@ part 'app_database.g.dart';
 
 /// Table: Products (existing)
 class Products extends Table {
+  // local primary key (auto incremented by Drift/SQLite)
   IntColumn get id => integer().autoIncrement()();
+
+  // remote/supabase id (nullable) — stored in DB column 'remote_id'
+  IntColumn get remoteId => integer().named('remote_id').nullable()();
+
   TextColumn get name => text()();
   RealColumn get price => real()();
   IntColumn get stock => integer()();
   TextColumn get description => text().nullable()();
-  TextColumn get imageUrl => text().nullable()();
+  // keep consistent name with Supabase column 'image_url' if you use that there
+  TextColumn get imageUrl => text().named('image_url').nullable()();
 }
 
 /// NEW: Sync queue table for offline-first queued operations
@@ -33,9 +39,9 @@ class AppDatabase extends _$AppDatabase {
   // If the DB file already exists on devices, we'll migrate to the new schema.
   AppDatabase() : super(_openConnection());
 
-  // Bump schema version because we added a table
+  // Bump schema version because we added a column/changed schema
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   // Migration strategy: create missing table(s) on upgrade
   @override
@@ -47,14 +53,19 @@ class AppDatabase extends _$AppDatabase {
 
         // onUpgrade runs when schemaVersion increases
         onUpgrade: (m, from, to) async {
-          if (from < 2) {
-            // Create the new table(s) added in schema version 2.
-            // This will create the SyncQueue table without touching existing data.
+          // if previous schema didn't have sync queue, create it
+          if (from < 2 && to >= 2) {
             await m.createTable(syncQueue);
+          }
+
+          // add remote_id column added in version 3
+          if (from < 3 && to >= 3) {
+            // add the new column to products
+            await m.addColumn(products, products.remoteId);
           }
         },
 
-        // You can also provide onDowngrade if needed in the future.
+        // onDowngrade can be added if needed.
       );
 }
 

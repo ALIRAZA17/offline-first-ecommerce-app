@@ -3,6 +3,7 @@ import 'package:offline_ecommerce/data/local/db/app_database.dart';
 import 'package:offline_ecommerce/domain/entities/product_entity.dart';
 
 class ProductModel {
+  // id is remote id (supabase). local row id is managed by Drift (Products.id)
   final int? id;
   final String name;
   final double price;
@@ -22,7 +23,7 @@ class ProductModel {
   /// Convert Drift row -> Model
   factory ProductModel.fromDrift(Product row) {
     return ProductModel(
-      id: row.id,
+      id: row.remoteId, // map remote id stored in DB to model.id
       name: row.name,
       price: row.price,
       stock: row.stock,
@@ -39,6 +40,8 @@ class ProductModel {
       stock: stock,
       description: Value(description),
       imageUrl: Value(imageUrl),
+      // remoteId is nullable; inserting with Value(id) if present
+      remoteId: Value(id),
     );
   }
 
@@ -57,7 +60,7 @@ class ProductModel {
   /// Convert Entity -> Model
   factory ProductModel.fromEntity(ProductEntity entity) {
     return ProductModel(
-      id: entity.id,
+      id: entity.id, // remote id
       name: entity.name,
       price: entity.price,
       stock: entity.stock,
@@ -74,7 +77,7 @@ class ProductModel {
       price: (map['price'] as num).toDouble(),
       stock: map['stock'] as int,
       description: map['description'] as String?,
-      imageUrl: map['imageUrl'] as String?,
+      imageUrl: map['image_url'] as String?,
     );
   }
 
@@ -86,7 +89,7 @@ class ProductModel {
       'price': price,
       'stock': stock,
       'description': description,
-      'imageUrl': imageUrl,
+      'image_url': imageUrl,
     };
   }
 }

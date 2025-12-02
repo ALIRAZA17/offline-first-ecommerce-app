@@ -21,6 +21,17 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
       'PRIMARY KEY AUTOINCREMENT',
     ),
   );
+  static const VerificationMeta _remoteIdMeta = const VerificationMeta(
+    'remoteId',
+  );
+  @override
+  late final GeneratedColumn<int> remoteId = GeneratedColumn<int>(
+    'remote_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _nameMeta = const VerificationMeta('name');
   @override
   late final GeneratedColumn<String> name = GeneratedColumn<String>(
@@ -73,6 +84,7 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    remoteId,
     name,
     price,
     stock,
@@ -93,6 +105,12 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('remote_id')) {
+      context.handle(
+        _remoteIdMeta,
+        remoteId.isAcceptableOrUnknown(data['remote_id']!, _remoteIdMeta),
+      );
     }
     if (data.containsKey('name')) {
       context.handle(
@@ -146,6 +164,10 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
         DriftSqlType.int,
         data['${effectivePrefix}id'],
       )!,
+      remoteId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}remote_id'],
+      ),
       name: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}name'],
@@ -177,6 +199,7 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
 
 class Product extends DataClass implements Insertable<Product> {
   final int id;
+  final int? remoteId;
   final String name;
   final double price;
   final int stock;
@@ -184,6 +207,7 @@ class Product extends DataClass implements Insertable<Product> {
   final String? imageUrl;
   const Product({
     required this.id,
+    this.remoteId,
     required this.name,
     required this.price,
     required this.stock,
@@ -194,6 +218,9 @@ class Product extends DataClass implements Insertable<Product> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
+    if (!nullToAbsent || remoteId != null) {
+      map['remote_id'] = Variable<int>(remoteId);
+    }
     map['name'] = Variable<String>(name);
     map['price'] = Variable<double>(price);
     map['stock'] = Variable<int>(stock);
@@ -209,6 +236,9 @@ class Product extends DataClass implements Insertable<Product> {
   ProductsCompanion toCompanion(bool nullToAbsent) {
     return ProductsCompanion(
       id: Value(id),
+      remoteId: remoteId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remoteId),
       name: Value(name),
       price: Value(price),
       stock: Value(stock),
@@ -228,6 +258,7 @@ class Product extends DataClass implements Insertable<Product> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Product(
       id: serializer.fromJson<int>(json['id']),
+      remoteId: serializer.fromJson<int?>(json['remoteId']),
       name: serializer.fromJson<String>(json['name']),
       price: serializer.fromJson<double>(json['price']),
       stock: serializer.fromJson<int>(json['stock']),
@@ -240,6 +271,7 @@ class Product extends DataClass implements Insertable<Product> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
+      'remoteId': serializer.toJson<int?>(remoteId),
       'name': serializer.toJson<String>(name),
       'price': serializer.toJson<double>(price),
       'stock': serializer.toJson<int>(stock),
@@ -250,6 +282,7 @@ class Product extends DataClass implements Insertable<Product> {
 
   Product copyWith({
     int? id,
+    Value<int?> remoteId = const Value.absent(),
     String? name,
     double? price,
     int? stock,
@@ -257,6 +290,7 @@ class Product extends DataClass implements Insertable<Product> {
     Value<String?> imageUrl = const Value.absent(),
   }) => Product(
     id: id ?? this.id,
+    remoteId: remoteId.present ? remoteId.value : this.remoteId,
     name: name ?? this.name,
     price: price ?? this.price,
     stock: stock ?? this.stock,
@@ -266,6 +300,7 @@ class Product extends DataClass implements Insertable<Product> {
   Product copyWithCompanion(ProductsCompanion data) {
     return Product(
       id: data.id.present ? data.id.value : this.id,
+      remoteId: data.remoteId.present ? data.remoteId.value : this.remoteId,
       name: data.name.present ? data.name.value : this.name,
       price: data.price.present ? data.price.value : this.price,
       stock: data.stock.present ? data.stock.value : this.stock,
@@ -280,6 +315,7 @@ class Product extends DataClass implements Insertable<Product> {
   String toString() {
     return (StringBuffer('Product(')
           ..write('id: $id, ')
+          ..write('remoteId: $remoteId, ')
           ..write('name: $name, ')
           ..write('price: $price, ')
           ..write('stock: $stock, ')
@@ -291,12 +327,13 @@ class Product extends DataClass implements Insertable<Product> {
 
   @override
   int get hashCode =>
-      Object.hash(id, name, price, stock, description, imageUrl);
+      Object.hash(id, remoteId, name, price, stock, description, imageUrl);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Product &&
           other.id == this.id &&
+          other.remoteId == this.remoteId &&
           other.name == this.name &&
           other.price == this.price &&
           other.stock == this.stock &&
@@ -306,6 +343,7 @@ class Product extends DataClass implements Insertable<Product> {
 
 class ProductsCompanion extends UpdateCompanion<Product> {
   final Value<int> id;
+  final Value<int?> remoteId;
   final Value<String> name;
   final Value<double> price;
   final Value<int> stock;
@@ -313,6 +351,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   final Value<String?> imageUrl;
   const ProductsCompanion({
     this.id = const Value.absent(),
+    this.remoteId = const Value.absent(),
     this.name = const Value.absent(),
     this.price = const Value.absent(),
     this.stock = const Value.absent(),
@@ -321,6 +360,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   });
   ProductsCompanion.insert({
     this.id = const Value.absent(),
+    this.remoteId = const Value.absent(),
     required String name,
     required double price,
     required int stock,
@@ -331,6 +371,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
        stock = Value(stock);
   static Insertable<Product> custom({
     Expression<int>? id,
+    Expression<int>? remoteId,
     Expression<String>? name,
     Expression<double>? price,
     Expression<int>? stock,
@@ -339,6 +380,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (remoteId != null) 'remote_id': remoteId,
       if (name != null) 'name': name,
       if (price != null) 'price': price,
       if (stock != null) 'stock': stock,
@@ -349,6 +391,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
 
   ProductsCompanion copyWith({
     Value<int>? id,
+    Value<int?>? remoteId,
     Value<String>? name,
     Value<double>? price,
     Value<int>? stock,
@@ -357,6 +400,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   }) {
     return ProductsCompanion(
       id: id ?? this.id,
+      remoteId: remoteId ?? this.remoteId,
       name: name ?? this.name,
       price: price ?? this.price,
       stock: stock ?? this.stock,
@@ -370,6 +414,9 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<int>(id.value);
+    }
+    if (remoteId.present) {
+      map['remote_id'] = Variable<int>(remoteId.value);
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
@@ -393,6 +440,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   String toString() {
     return (StringBuffer('ProductsCompanion(')
           ..write('id: $id, ')
+          ..write('remoteId: $remoteId, ')
           ..write('name: $name, ')
           ..write('price: $price, ')
           ..write('stock: $stock, ')
@@ -768,6 +816,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 typedef $$ProductsTableCreateCompanionBuilder =
     ProductsCompanion Function({
       Value<int> id,
+      Value<int?> remoteId,
       required String name,
       required double price,
       required int stock,
@@ -777,6 +826,7 @@ typedef $$ProductsTableCreateCompanionBuilder =
 typedef $$ProductsTableUpdateCompanionBuilder =
     ProductsCompanion Function({
       Value<int> id,
+      Value<int?> remoteId,
       Value<String> name,
       Value<double> price,
       Value<int> stock,
@@ -795,6 +845,11 @@ class $$ProductsTableFilterComposer
   });
   ColumnFilters<int> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get remoteId => $composableBuilder(
+    column: $table.remoteId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -838,6 +893,11 @@ class $$ProductsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get remoteId => $composableBuilder(
+    column: $table.remoteId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get name => $composableBuilder(
     column: $table.name,
     builder: (column) => ColumnOrderings(column),
@@ -875,6 +935,9 @@ class $$ProductsTableAnnotationComposer
   });
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get remoteId =>
+      $composableBuilder(column: $table.remoteId, builder: (column) => column);
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
@@ -923,6 +986,7 @@ class $$ProductsTableTableManager
           updateCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
+                Value<int?> remoteId = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<double> price = const Value.absent(),
                 Value<int> stock = const Value.absent(),
@@ -930,6 +994,7 @@ class $$ProductsTableTableManager
                 Value<String?> imageUrl = const Value.absent(),
               }) => ProductsCompanion(
                 id: id,
+                remoteId: remoteId,
                 name: name,
                 price: price,
                 stock: stock,
@@ -939,6 +1004,7 @@ class $$ProductsTableTableManager
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
+                Value<int?> remoteId = const Value.absent(),
                 required String name,
                 required double price,
                 required int stock,
@@ -946,6 +1012,7 @@ class $$ProductsTableTableManager
                 Value<String?> imageUrl = const Value.absent(),
               }) => ProductsCompanion.insert(
                 id: id,
+                remoteId: remoteId,
                 name: name,
                 price: price,
                 stock: stock,

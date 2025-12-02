@@ -1,5 +1,6 @@
 class ProductEntity {
-  final int? id;
+  final int? id;         
+  final int? remoteId;   
   final String name;
   final double price;
   final int stock;
@@ -8,6 +9,7 @@ class ProductEntity {
 
   ProductEntity({
     this.id,
+    this.remoteId,
     required this.name,
     required this.price,
     required this.stock,

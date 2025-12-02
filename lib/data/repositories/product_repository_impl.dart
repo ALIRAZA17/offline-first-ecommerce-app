@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:drift/drift.dart';
 import 'package:offline_ecommerce/data/local/daos/products/products_dao.dart';
 import 'package:offline_ecommerce/data/local/daos/sync_queue/sync_queue_dao.dart';
@@ -37,11 +36,14 @@ class ProductRepositoryImpl implements ProductRepository {
       try {
         final remoteProducts = await remoteDataSource.getProducts();
 
-        // Clear local DB and insert fresh remote data
+        // Clear local DB and insert fresh remote data (preserving remote_id)
         await productsDao.clearProducts();
-        await productsDao.insertProducts(
-          remoteProducts.map((p) => p.toCompanion()).toList(),
-        );
+
+        final companions = remoteProducts
+            .map((p) => p.toCompanion())
+            .toList(growable: false);
+
+        await productsDao.insertProducts(companions);
       } catch (_) {
         // Ignore errors, local products still shown
       }
@@ -52,7 +54,8 @@ class ProductRepositoryImpl implements ProductRepository {
 
   @override
   Future<ProductEntity?> getProduct(int id) async {
-    final local = await productsDao.getProductById(id);
+    // id here is remote id (supabase id)
+    final local = await productsDao.getProductByRemoteId(id);
     if (local != null) return ProductModel.fromDrift(local).toEntity();
 
     if (await networkInfo.isConnected) {
@@ -72,27 +75,22 @@ class ProductRepositoryImpl implements ProductRepository {
   Future<void> addProduct(ProductEntity product) async {
     final model = ProductModel.fromEntity(product);
 
-    // Always insert locally
-    await productsDao.insertProduct(model.toCompanion());
+    // Always insert locally (remoteId null initially)
+    final localRowId = await productsDao.insertProduct(model.toCompanion());
 
     if (await networkInfo.isConnected) {
       try {
         final remoteProduct = await remoteDataSource.addProduct(model);
 
-        // Update local DB with remote ID
-        final row = await productsDao.getProductById(model.id ?? 0);
-        if (row != null) {
-          final updatedRow = Product(
-            id: remoteProduct.id!,
-            name: remoteProduct.name,
-            price: remoteProduct.price,
-            stock: remoteProduct.stock,
-            description: remoteProduct.description,
-            imageUrl: remoteProduct.imageUrl,
+        // Update the local row to set remote_id = remoteProduct.id
+        final localRow = await productsDao.getProductById(localRowId);
+        if (localRow != null) {
+          final updatedRow = localRow.copyWith(
+            remoteId: Value(remoteProduct.id),
           );
           await productsDao.updateProduct(updatedRow);
         }
-      } catch (_) {
+      } catch (e) {
         // If fails, enqueue
         await syncQueueDao.enqueue(
           operation: 'add',
@@ -107,6 +105,8 @@ class ProductRepositoryImpl implements ProductRepository {
         tableName: 'products',
         payload: jsonEncode(model.toMap()),
       );
+
+      print("[ADD] Offline → enqueueing");
     }
   }
 
@@ -115,44 +115,79 @@ class ProductRepositoryImpl implements ProductRepository {
   Future<void> updateProduct(ProductEntity product) async {
     final model = ProductModel.fromEntity(product);
 
-    // Update local DB
-    final row = await productsDao.getProductById(model.id!);
-    if (row != null) {
-      final updatedRow = row.copyWith(
-        name: model.name,
-        price: model.price,
-        stock: model.stock,
-        description: Value(model.description),
-        imageUrl: Value(model.imageUrl),
-      );
-      await productsDao.updateProduct(updatedRow);
+    // model.id is remote id (nullable)
+    // first try to fetch local row by remote id
+    Product? localRow;
+    if (model.id != null) {
+      localRow = await productsDao.getProductByRemoteId(model.id!);
     }
 
+    // If not found by remoteId, maybe the product is local-only (rare). Try to find by name/other heuristics if necessary
+    if (localRow == null) {
+      final allLocal = await productsDao.getAllProducts();
+      final maybe = allLocal.firstWhere(
+        (r) => r.name == model.name && (r.remoteId == null),
+        orElse: () => null as Product,
+      );
+      if (maybe != null) {
+        localRow = maybe;
+      }
+    }
+
+    // Update local if we have a local primary row
+    final updatedRow = localRow.copyWith(
+      name: model.name,
+      price: model.price,
+      stock: model.stock,
+      description: Value(model.description),
+      imageUrl: Value(model.imageUrl),
+    );
+    await productsDao.updateProduct(updatedRow);
+
     // Try remote if online, else enqueue
-    if (await networkInfo.isConnected) {
+    final isOnline = await networkInfo.isConnected;
+    print("[UPDATE] Network status → ${isOnline ? 'ONLINE' : 'OFFLINE'}");
+
+    if (isOnline) {
       try {
-        await remoteDataSource.updateProduct(model);
-      } catch (_) {
+        // if model.id is null we cannot update remote (we must add instead)
+        if (model.id == null) {
+          final newRemote = await remoteDataSource.addProduct(model);
+          // insert the remote product into local DB
+          await productsDao.insertProduct(newRemote.toCompanion());
+        } else {
+          await remoteDataSource.updateProduct(model);
+        }
+
+        return;
+      } catch (e) {
         await syncQueueDao.enqueue(
           operation: 'update',
           tableName: 'products',
           payload: jsonEncode(model.toMap()),
         );
+
+        return;
       }
-    } else {
-      await syncQueueDao.enqueue(
-        operation: 'update',
-        tableName: 'products',
-        payload: jsonEncode(model.toMap()),
-      );
     }
+
+    // Offline → queue
+    await syncQueueDao.enqueue(
+      operation: 'update',
+      tableName: 'products',
+      payload: jsonEncode(model.toMap()),
+    );
   }
 
   /// Offline-first delete
   @override
   Future<void> deleteProduct(int id) async {
-    // Delete locally
-    await productsDao.deleteProduct(id);
+    // id is remote id
+    // Delete locally: find row by remote id and delete the local primary id
+    final localRow = await productsDao.getProductByRemoteId(id);
+    if (localRow != null) {
+      await productsDao.deleteProduct(localRow.id);
+    }
 
     // Try remote if online, else enqueue
     if (await networkInfo.isConnected) {
@@ -174,12 +209,14 @@ class ProductRepositoryImpl implements ProductRepository {
     }
   }
 
+  /// Called by the sync queue processor when adding from map
   @override
   Future<void> addProductFromMap(Map<String, dynamic> map) async {
     final product = ProductModel.fromMap(map).toEntity();
     await addProduct(product);
   }
 
+  /// Called by the sync queue processor when updating from map
   @override
   Future<void> updateProductFromMap(Map<String, dynamic> map) async {
     final product = ProductModel.fromMap(map).toEntity();
