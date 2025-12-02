@@ -10,19 +10,15 @@ import 'package:offline_ecommerce/presentation/cubits/product/product_cubit.dart
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Supabase
   await SupabaseInitializer.initialize();
 
-  // Initialize dependency injection
   await configureDependencies();
 
-  // Get the sync service and flush any pending jobs at startup
   final syncService = getIt<SyncQueueService>();
   await syncService.flushQueue();
 
-  // Listen to connectivity changes and flush queue whenever online
   final connectivity =
-      getIt<ConnectivityDI>().connectivity; // or just ConnectivityDI
+      getIt<ConnectivityDI>().connectivity;
   connectivity.onConnectivityChanged.listen((_) async {
     await syncService.flushQueue();
   });
@@ -47,7 +43,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-/// Provide ProductCubit globally so dialogs/tiles can access it
 class HomeWrapper extends StatelessWidget {
   const HomeWrapper({super.key});
 

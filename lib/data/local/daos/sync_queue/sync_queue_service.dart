@@ -5,11 +5,10 @@ import 'package:offline_ecommerce/core/network/network_info.dart';
 import 'package:offline_ecommerce/data/local/daos/sync_queue/sync_queue_dao_di.dart';
 import 'package:offline_ecommerce/domain/repositories/product_repository.dart';
 
-/// A service that continuously flushes the SyncQueue whenever online
 @LazySingleton()
 class SyncQueueService {
-  final SyncQueueDaoDI syncQueueDao; // inject DI version
-  final ProductRepository productRepository; // inject DI version
+  final SyncQueueDaoDI syncQueueDao;
+  final ProductRepository productRepository;
   final NetworkInfo networkInfo;
 
   SyncQueueService({
@@ -18,7 +17,6 @@ class SyncQueueService {
     required this.networkInfo,
   });
 
-  /// Flush all pending jobs in order (FIFO)
   Future<void> flushQueue() async {
     if (!await networkInfo.isConnected) return;
 
@@ -44,10 +42,8 @@ class SyncQueueService {
             break;
         }
 
-        // Remove job from queue after success
         await syncQueueDao.removeJob(job.id);
       } catch (_) {
-        // Ignore errors and continue with next job
       }
     }
   }
